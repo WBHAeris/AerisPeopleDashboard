@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Aeris Tech People Dashboard</title>
+    <link rel="stylesheet" href="styles.css?v=2025081301">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo-section">
+                <i class="fas fa-wind"></i>
+                <h1>Aeris Tech People</h1>
+            </div>
+            <div class="user-section">
+                <i class="fas fa-user-circle"></i>
+                <span>Welcome, Admin</span>
+            </div>
+        </header>
+
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="nav-menu">
+                <div class="menu-item active" data-section="dashboard">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </div>
+                <div class="menu-item" data-section="tracking">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Tracking</span>
+                </div>
+                <div class="menu-item" data-section="hiring">
+                    <i class="fas fa-user-plus"></i>
+                    <span>Hiring</span>
+                </div>
+                <div class="menu-item" data-section="file-manager">
+                    <i class="fas fa-file-upload"></i>
+                    <span>File Upload Manager</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Dashboard Section -->
+            <section id="dashboard" class="content-section active">
+                <div class="section-header">
+                    <h2>Dashboard Overview</h2>
+                    <p>Welcome to Aeris Tech People Dashboard</p>
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-card clickable" onclick="window.location.href='tech-people-portal.html'">
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>Total Tech People Count</h3>
+                            <p class="stat-number">127</p>
+                            <small class="stat-source">Click for Tech People Portal</small>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-user-check"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>Active Tracking</h3>
+                            <p class="stat-number">98</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-briefcase"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>Open Positions</h3>
+                            <p class="stat-number">0</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-user-graduate"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>New Hires (This Month)</h3>
+                            <p class="stat-number">8</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-user-plus"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>New Additions (Year to Date)</h3>
+                            <p class="stat-number">0</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-user-minus"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>Leaving This Month</h3>
+                            <p class="stat-number">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="quick-actions">
+                    <h3>Quick Actions</h3>
+                    <div class="action-buttons">
+                        <button class="action-btn" onclick="switchSection('tracking')">
+                            <i class="fas fa-chart-line"></i>
+                            View Tracking
+                        </button>
+                        <button class="action-btn" onclick="switchSection('hiring')">
+                            <i class="fas fa-user-plus"></i>
+                            Manage Hiring
+                        </button>
+                    </div>
+                </div>
+
+                <div class="data-source-info">
+                    <div class="info-header">
+                        <i class="fas fa-info-circle"></i>
+                        <h3>Data Source Information</h3>
+                    </div>
+                    <p>Dashboard statistics are automatically updated from uploaded files containing "allpeople" in the filename. 
+                    Upload your employee data file with a name like "allpeople.csv" or "allpeople.json" to see live data.</p>
+                    <button class="btn-secondary" onclick="switchSection('file-manager')">
+                        <i class="fas fa-upload"></i>
+                        Upload Employee Data
+                    </button>
+                </div>
+
+                <div class="uploaded-allpeople-files">
+                    <div class="section-header-small">
+                        <h3>Uploaded Employee Data Files</h3>
+                        <button class="btn-refresh" onclick="refreshDashboardData()" title="Refresh Dashboard Data">
+                            <i class="fas fa-sync-alt"></i>
+                            Refresh Data
+                        </button>
+                    </div>
+                    
+                    <div id="allpeopleFilesList" class="allpeople-files-container">
+                        <!-- Will be populated by JavaScript -->
+                        <div class="no-files-message" id="noFilesMessage">
+                            <i class="fas fa-file-upload"></i>
+                            <p>No employee data files uploaded yet</p>
+                            <small>Upload a file with "allpeople" in the name to populate dashboard data</small>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tracking Section -->
+            <section id="tracking" class="content-section">
+                <div class="section-header">
+                    <h2>Employee Tracking</h2>
+                    <p>Monitor employee performance and activities</p>
+                </div>
+                
+                <div class="tracking-controls">
+                    <div class="filter-group">
+                        <label for="department-filter">Department:</label>
+                        <select id="department-filter">
+                            <option value="all">All Departments</option>
+                            <option value="engineering">Engineering</option>
+                            <option value="marketing">Marketing</option>
+                            <option value="sales">Sales</option>
+                            <option value="hr">Human Resources</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label for="status-filter">Status:</label>
+                        <select id="status-filter">
+                            <option value="all">All Status</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                            <option value="on-leave">On Leave</option>
+                        </select>
+                    </div>
+                    
+                    <button class="btn-primary">
+                        <i class="fas fa-search"></i>
+                        Search
+                    </button>
+                </div>
+
+                <div class="tracking-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Employee</th>
+                                <th>Department</th>
+                                <th>Status</th>
+                                <th>Last Activity</th>
+                                <th>Performance</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>
+                                    <div class="employee-info">
+                                        <img src="https://via.placeholder.com/32x32" alt="Employee" class="employee-avatar">
+                                        <span>John Smith</span>
+                                    </div>
+                                </td>
+                                <td>Engineering</td>
+                                <td><span class="status-badge active">Active</span></td>
+                                <td>2 hours ago</td>
+                                <td>
+                                    <div class="performance-bar">
+                                        <div class="performance-fill" style="width: 85%"></div>
+                                    </div>
+                                    <span>85%</span>
+                                </td>
+                                <td>
+                                    <button class="btn-small">View Details</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <div class="employee-info">
+                                        <img src="https://via.placeholder.com/32x32" alt="Employee" class="employee-avatar">
+                                        <span>Sarah Johnson</span>
+                                    </div>
+                                </td>
+                                <td>Marketing</td>
+                                <td><span class="status-badge active">Active</span></td>
+                                <td>1 hour ago</td>
+                                <td>
+                                    <div class="performance-bar">
+                                        <div class="performance-fill" style="width: 92%"></div>
+                                    </div>
+                                    <span>92%</span>
+                                </td>
+                                <td>
+                                    <button class="btn-small">View Details</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <div class="employee-info">
+                                        <img src="https://via.placeholder.com/32x32" alt="Employee" class="employee-avatar">
+                                        <span>Mike Wilson</span>
+                                    </div>
+                                </td>
+                                <td>Sales</td>
+                                <td><span class="status-badge on-leave">On Leave</span></td>
+                                <td>3 days ago</td>
+                                <td>
+                                    <div class="performance-bar">
+                                        <div class="performance-fill" style="width: 78%"></div>
+                                    </div>
+                                    <span>78%</span>
+                                </td>
+                                <td>
+                                    <button class="btn-small">View Details</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Hiring Section -->
+            <section id="hiring" class="content-section">
+                <div class="section-header">
+                    <h2>Hiring Management</h2>
+                    <p>Manage job openings and candidate applications</p>
+                </div>
+                
+                <div class="hiring-actions">
+                    <button class="btn-primary">
+                        <i class="fas fa-plus"></i>
+                        Add New Position
+                    </button>
+                    <button class="btn-secondary">
+                        <i class="fas fa-file-export"></i>
+                        Export Report
+                    </button>
+                    <button class="btn-secondary" onclick="document.getElementById('hiringFileInput').click()">
+                        <i class="fas fa-file-upload"></i>
+                        Upload Hiring CSV
+                    </button>
+                    <button class="btn-danger" onclick="removeHiringData()" title="Remove all hiring data">
+                        <i class="fas fa-trash-alt"></i>
+                        Remove CSV Data
+                    </button>
+                    <input type="file" id="hiringFileInput" accept=".csv" style="display: none;" onchange="handleHiringFileUpload(event)">
+                </div>
+
+                <!-- Hiring Data Analysis -->
+                <div id="hiringAnalysis" class="hiring-analysis" style="display: none;">
+                    <div class="section-header-small">
+                        <h3>Hiring Data Analysis</h3>
+                        <button class="btn-refresh" onclick="refreshHiringData()" title="Refresh Hiring Data">
+                            <i class="fas fa-sync-alt"></i>
+                            Refresh
+                        </button>
+                    </div>
+                    
+                    <div class="hiring-stats-grid">
+                        <div class="hiring-stat-card">
+                            <h4>Total Open Positions</h4>
+                            <p class="hiring-stat-number" id="totalOpenPositions">0</p>
+                        </div>
+                        <div class="hiring-stat-card">
+                            <h4>Unique Job Titles</h4>
+                            <p class="hiring-stat-number" id="uniqueJobTitles">0</p>
+                        </div>
+                        <div class="hiring-stat-card">
+                            <h4>sTLTs with Openings</h4>
+                            <p class="hiring-stat-number" id="stltsWithOpenings">0</p>
+                        </div>
+                    </div>
+
+                    <div class="hiring-breakdown">
+                        <div class="breakdown-section">
+                            <h4>Openings by Job Title</h4>
+                            <div id="openingsByJobTitle" class="breakdown-list">
+                                <!-- Will be populated by JavaScript -->
+                            </div>
+                        </div>
+                        
+                        <div class="breakdown-section">
+                            <h4>Openings by sTLT</h4>
+                            <div id="openingsBySTLT" class="breakdown-list">
+                                <!-- Will be populated by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hiring-grid" id="hiringGrid">
+                    <!-- Will be populated by JavaScript from CSV data -->
+                    <div class="no-hiring-data" id="noHiringData">
+                        <div class="no-data-message">
+                            <i class="fas fa-briefcase"></i>
+                            <h3>No Hiring Data Available</h3>
+                            <p>Upload a hiring CSV file to view job openings and manage positions</p>
+                            <button class="btn-primary" onclick="document.getElementById('hiringFileInput').click()">
+                                <i class="fas fa-file-upload"></i>
+                                Upload Hiring CSV
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="recent-applications" id="recentApplications" style="display: none;">
+                    <h3>Recent Applications</h3>
+                    <div class="applications-list" id="applicationsList">
+                        <!-- Will be populated by JavaScript from CSV data -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- File Upload Manager Section -->
+            <section id="file-manager" class="content-section">
+                <div class="section-header">
+                    <h2>File Upload Manager</h2>
+                    <p>Upload and manage data files for the dashboard</p>
+                </div>
+
+                <div class="upload-area">
+                    <div class="upload-zone" id="uploadZone">
+                        <div class="upload-content">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <h3>Upload Data Files</h3>
+                            <p>Drag and drop files here or click to browse</p>
+                            <p class="file-types">Supported formats: CSV, JSON, Excel (.xlsx, .xls)</p>
+                            <input type="file" id="fileInput" multiple accept=".csv,.json,.xlsx,.xls,.txt" style="display: none;">
+                            <button class="btn-primary" id="browseButton">
+                                <i class="fas fa-folder-open"></i>
+                                Browse Files
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="file-management-actions">
+                    <button class="bulk-action-btn primary" onclick="processAllFiles()">
+                        <i class="fas fa-cogs"></i>
+                        Process All Files
+                    </button>
+                    <button class="bulk-action-btn" onclick="downloadAllFiles()">
+                        <i class="fas fa-download"></i>
+                        Download All
+                    </button>
+                    <button class="bulk-action-btn danger" onclick="deleteAllFiles()">
+                        <i class="fas fa-trash-alt"></i>
+                        Delete All Files
+                    </button>
+                    <div class="file-count-display">
+                        <span>Total Files: </span>
+                        <span class="file-count-badge">
+                            <span class="file-count">3</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="uploaded-files">
+                    <h3>Uploaded Files</h3>
+                    <div class="files-list" id="filesList">
+                        <!-- Sample uploaded files -->
+                        <div class="file-item">
+                            <div class="file-info">
+                                <i class="fas fa-file-csv file-icon csv"></i>
+                                <div class="file-details">
+                                    <h4>employees_data.csv</h4>
+                                    <p>1.2 MB • Uploaded 2 hours ago</p>
+                                    <span class="file-status processed">Processed</span>
+                                </div>
+                            </div>
+                            <div class="file-actions">
+                                <button class="btn-small" onclick="viewFileData('employees_data.csv')">
+                                    <i class="fas fa-eye"></i>
+                                    View Data
+                                </button>
+                                <button class="btn-small" onclick="processFile('employees_data.csv')">
+                                    <i class="fas fa-sync"></i>
+                                    Reprocess
+                                </button>
+                                <button class="btn-small btn-danger" onclick="deleteFile('employees_data.csv')">
+                                    <i class="fas fa-trash"></i>
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="file-item">
+                            <div class="file-info">
+                                <i class="fas fa-file-excel file-icon excel"></i>
+                                <div class="file-details">
+                                    <h4>job_applications.xlsx</h4>
+                                    <p>3.5 MB • Uploaded 1 day ago</p>
+                                    <span class="file-status processed">Processed</span>
+                                </div>
+                            </div>
+                            <div class="file-actions">
+                                <button class="btn-small" onclick="viewFileData('job_applications.xlsx')">
+                                    <i class="fas fa-eye"></i>
+                                    View Data
+                                </button>
+                                <button class="btn-small" onclick="processFile('job_applications.xlsx')">
+                                    <i class="fas fa-sync"></i>
+                                    Reprocess
+                                </button>
+                                <button class="btn-small btn-danger" onclick="deleteFile('job_applications.xlsx')">
+                                    <i class="fas fa-trash"></i>
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="file-item">
+                            <div class="file-info">
+                                <i class="fas fa-file-code file-icon json"></i>
+                                <div class="file-details">
+                                    <h4>performance_metrics.json</h4>
+                                    <p>856 KB • Uploading...</p>
+                                    <span class="file-status uploading">Uploading (75%)</span>
+                                </div>
+                            </div>
+                            <div class="file-actions">
+                                <button class="btn-small" disabled>
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    Processing
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="file-processing">
+                    <h3>Data Processing Options</h3>
+                    <div class="processing-options">
+                        <div class="option-card">
+                            <div class="option-header">
+                                <i class="fas fa-users"></i>
+                                <h4>Employee Data</h4>
+                            </div>
+                            <p>Process employee information, performance metrics, and status updates</p>
+                            <div class="option-settings">
+                                <label>
+                                    <input type="checkbox" checked> Auto-update dashboard statistics
+                                </label>
+                                <label>
+                                    <input type="checkbox" checked> Validate data integrity
+                                </label>
+                                <label>
+                                    <input type="checkbox"> Backup existing data
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="option-card">
+                            <div class="option-header">
+                                <i class="fas fa-briefcase"></i>
+                                <h4>Hiring Data</h4>
+                            </div>
+                            <p>Import job postings, applications, and candidate information</p>
+                            <div class="option-settings">
+                                <label>
+                                    <input type="checkbox" checked> Update job listings
+                                </label>
+                                <label>
+                                    <input type="checkbox" checked> Process applications
+                                </label>
+                                <label>
+                                    <input type="checkbox"> Send notifications
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="option-card">
+                            <div class="option-header">
+                                <i class="fas fa-chart-bar"></i>
+                                <h4>Analytics Data</h4>
+                            </div>
+                            <p>Import performance metrics, KPIs, and reporting data</p>
+                            <div class="option-settings">
+                                <label>
+                                    <input type="checkbox" checked> Generate reports
+                                </label>
+                                <label>
+                                    <input type="checkbox"> Update charts
+                                </label>
+                                <label>
+                                    <input type="checkbox"> Archive old data
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="upload-history">
+                    <h3>Upload History</h3>
+                    <div class="history-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>File Name</th>
+                                    <th>Type</th>
+                                    <th>Size</th>
+                                    <th>Upload Date</th>
+                                    <th>Status</th>
+                                    <th>Records</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>employees_data.csv</td>
+                                    <td>Employee Data</td>
+                                    <td>1.2 MB</td>
+                                    <td>Aug 12, 2025 14:30</td>
+                                    <td><span class="status-badge success">Success</span></td>
+                                    <td>127 records</td>
+                                </tr>
+                                <tr>
+                                    <td>job_applications.xlsx</td>
+                                    <td>Hiring Data</td>
+                                    <td>3.5 MB</td>
+                                    <td>Aug 11, 2025 09:15</td>
+                                    <td><span class="status-badge success">Success</span></td>
+                                    <td>45 applications</td>
+                                </tr>
+                                <tr>
+                                    <td>old_employee_data.csv</td>
+                                    <td>Employee Data</td>
+                                    <td>980 KB</td>
+                                    <td>Aug 10, 2025 16:45</td>
+                                    <td><span class="status-badge error">Failed</span></td>
+                                    <td>Data validation error</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script src="excel-pivot.js?v=2025081301"></script>
+    <script src="script.js?v=2025081301"></script>
+</body>
+</html>
