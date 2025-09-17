@@ -1354,30 +1354,44 @@ function updateDashboardFromAllPeople() {
                 // Get offboard date from Column J (index 9) 
                 const offboardDateStr = employee[Object.keys(employee)[9]] || '';
                 
+                console.log(`🔍 Checking employee: ${employee[Object.keys(employee)[0]] || 'Unknown'}`);
+                console.log(`   📅 Onboard raw: "${onboardDateStr}"`);
+                console.log(`   📅 Offboard raw: "${offboardDateStr}"`);
+                
                 // Parse onboard date
                 let onboardDate = null;
                 if (onboardDateStr && onboardDateStr.trim() !== '') {
                     onboardDate = new Date(onboardDateStr);
+                    console.log(`   📅 Onboard parsed: ${onboardDate} (valid: ${!isNaN(onboardDate.getTime())})`);
+                    
                     if (isNaN(onboardDate.getTime())) {
                         // Try different date formats if needed
                         const parts = onboardDateStr.split('/');
                         if (parts.length === 3) {
                             onboardDate = new Date(parts[2], parts[0] - 1, parts[1]); // MM/DD/YYYY
+                            console.log(`   📅 Onboard retry: ${onboardDate} (valid: ${!isNaN(onboardDate.getTime())})`);
                         }
                     }
+                } else {
+                    console.log(`   📅 Onboard: EMPTY/NULL - assuming valid`);
                 }
                 
                 // Parse offboard date
                 let offboardDate = null;
                 if (offboardDateStr && offboardDateStr.trim() !== '') {
                     offboardDate = new Date(offboardDateStr);
+                    console.log(`   📅 Offboard parsed: ${offboardDate} (valid: ${!isNaN(offboardDate.getTime())})`);
+                    
                     if (isNaN(offboardDate.getTime())) {
                         // Try different date formats if needed
                         const parts = offboardDateStr.split('/');
                         if (parts.length === 3) {
                             offboardDate = new Date(parts[2], parts[0] - 1, parts[1]); // MM/DD/YYYY
+                            console.log(`   📅 Offboard retry: ${offboardDate} (valid: ${!isNaN(offboardDate.getTime())})`);
                         }
                     }
+                } else {
+                    console.log(`   📅 Offboard: EMPTY/NULL - assuming still active`);
                 }
                 
                 // Employee is active if:
@@ -1388,14 +1402,19 @@ function updateDashboardFromAllPeople() {
                 
                 const isActive = isOnboarded && isNotOffboarded;
                 
+                console.log(`   ✅ Onboarded (${onboardDate ? onboardDate.toDateString() : 'NULL'} <= ${today.toDateString()}): ${isOnboarded}`);
+                console.log(`   ✅ Not offboarded (${offboardDate ? offboardDate.toDateString() : 'NULL'} > ${today.toDateString()}): ${isNotOffboarded}`);
+                console.log(`   🎯 RESULT: ${isActive ? 'ACTIVE' : 'INACTIVE'}`);
+                console.log('---');
+                
                 // Debug specific exclusions
                 if (!isActive) {
                     const name = employee[Object.keys(employee)[0]] || 'Unknown';
                     if (!isOnboarded) {
-                        console.log(`EXCLUDED (future start): ${name} - onboard date: ${onboardDateStr} (parsed: ${onboardDate})`);
+                        console.log(`❌ EXCLUDED (future start): ${name} - onboard date: ${onboardDateStr} (parsed: ${onboardDate})`);
                     }
                     if (!isNotOffboarded) {
-                        console.log(`EXCLUDED (past/current end): ${name} - offboard date: ${offboardDateStr} (parsed: ${offboardDate})`);
+                        console.log(`❌ EXCLUDED (past/current end): ${name} - offboard date: ${offboardDateStr} (parsed: ${offboardDate})`);
                     }
                 }
                 
@@ -3948,3 +3967,51 @@ function clearAllData() {
 
 // Make clear function available globally
 window.clearAllData = clearAllData;
+
+// Function to debug the first few employees and their dates
+function debugEmployeeDates() {
+    console.log('=== EMPLOYEE DATES DEBUG ===');
+    
+    // Get data from localStorage
+    let allPeopleData = null;
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('aeris_file_') && key.toLowerCase().includes('allpeople')) {
+            try {
+                allPeopleData = JSON.parse(localStorage.getItem(key));
+                break;
+            } catch (error) {
+                console.error('Error loading data:', error);
+            }
+        }
+    }
+    
+    if (!allPeopleData || !allPeopleData.rawData) {
+        console.log('❌ No allpeople data found');
+        return;
+    }
+    
+    const employeeData = allPeopleData.rawData;
+    const headers = Object.keys(employeeData[0]);
+    
+    console.log(`📋 Headers:`, headers);
+    console.log(`📊 Column I (index 8): "${headers[8]}"`);
+    console.log(`📊 Column J (index 9): "${headers[9]}"`);
+    
+    // Show first 5 employees and their dates
+    for (let i = 0; i < Math.min(5, employeeData.length); i++) {
+        const emp = employeeData[i];
+        const name = emp[headers[0]] || 'Unknown';
+        const onboard = emp[headers[8]] || 'EMPTY';
+        const offboard = emp[headers[9]] || 'EMPTY';
+        
+        console.log(`👤 Employee ${i + 1}: ${name}`);
+        console.log(`   📅 Onboard (col I): "${onboard}"`);
+        console.log(`   📅 Offboard (col J): "${offboard}"`);
+    }
+    
+    console.log('=== END DEBUG ===');
+}
+
+// Make debug function available globally
+window.debugEmployeeDates = debugEmployeeDates;
