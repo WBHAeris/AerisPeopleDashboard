@@ -1209,17 +1209,23 @@ function updateDashboardWithCSV(data, filename) {
     console.log('📊 CSV Data Preview:', data.length, 'records');
     console.log('📋 First record sample:', data[0]);
     
-    // Store in appropriate location based on filename
+    // Store in the EXACT format that updateDashboardFromAllPeople expects
     const storageKey = `aeris_file_${filename}`;
     const fileData = {
         filename: filename,
-        rawData: data,
+        rawData: data,  // This is the key field updateDashboardFromAllPeople looks for
         uploadedAt: new Date().toISOString(),
         processedData: true
     };
     
+    // Store in localStorage 
     localStorage.setItem(storageKey, JSON.stringify(fileData));
     console.log(`💾 Stored CSV data with key: ${storageKey}`);
+    console.log(`💾 Data structure:`, {
+        filename: fileData.filename,
+        rawDataLength: fileData.rawData ? fileData.rawData.length : 'null',
+        uploadedAt: fileData.uploadedAt
+    });
     
     // Also store in memory for immediate access
     if (typeof window.fileStorage === 'undefined') {
@@ -1234,8 +1240,11 @@ function updateDashboardWithCSV(data, filename) {
         console.log('📋 Headers detected:', headers);
         
         if (filename.toLowerCase().includes('allpeople')) {
-            console.log('✅ Detected as ALLPEOPLE file - will update dashboard');
-            updateDashboardFromAllPeople();
+            console.log('✅ Detected as ALLPEOPLE file - updating dashboard immediately');
+            // Small delay to ensure storage is complete
+            setTimeout(() => {
+                updateDashboardFromAllPeople();
+            }, 100);
         } else if (headers.includes('name') || headers.includes('employee')) {
             console.log('✅ Detected as EMPLOYEE data');
             updateEmployeeData(data);
@@ -2297,20 +2306,34 @@ function addToFileStorage(file) {
         window.fileStorage.set(file.name, fileData);
         console.log('File stored in memory:', file.name, 'Total files:', window.fileStorage.size); // Debug log
         
-        // Also save to localStorage for persistence
+        // Also save to localStorage for persistence in the correct format
         try {
-            const storageData = JSON.stringify({
-                content: e.target.result,
-                metadata: {
-                    name: file.name,
-                    size: file.size,
-                    type: file.type,
-                    uploadDate: fileData.uploadDate,
-                    processed: false
-                }
-            });
-            localStorage.setItem(`aeris_file_${file.name}`, storageData);
-            console.log('File saved to localStorage:', file.name); // Debug log
+            // For CSV files, parse and store in the format updateDashboardFromAllPeople expects
+            if (file.name.toLowerCase().endsWith('.csv')) {
+                const parsedData = parseCSV(e.target.result);
+                const storageData = {
+                    filename: file.name,
+                    rawData: parsedData,  // Store parsed CSV data
+                    uploadedAt: fileData.uploadDate,
+                    processedData: true
+                };
+                localStorage.setItem(`aeris_file_${file.name}`, JSON.stringify(storageData));
+                console.log(`💾 CSV file saved to localStorage with parsed data: ${file.name}, records: ${parsedData.length}`);
+            } else {
+                // For other files, use the original format
+                const storageData = JSON.stringify({
+                    content: e.target.result,
+                    metadata: {
+                        name: file.name,
+                        size: file.size,
+                        type: file.type,
+                        uploadDate: fileData.uploadDate,
+                        processed: false
+                    }
+                });
+                localStorage.setItem(`aeris_file_${file.name}`, storageData);
+                console.log('File saved to localStorage:', file.name);
+            }
         } catch (error) {
             console.warn('Could not save to localStorage:', error);
         }
