@@ -1139,22 +1139,58 @@ function processFileData(file) {
 }
 
 function parseCSV(csv) {
-    const lines = csv.split('\n');
-    const headers = lines[0].split(',').map(h => h.trim());
-    const data = [];
+    console.log('🔍 CSV Parsing Debug:');
+    console.log(`📄 Raw CSV length: ${csv.length} characters`);
     
-    for (let i = 1; i < lines.length; i++) {
-        if (lines[i].trim()) {
-            const values = lines[i].split(',').map(v => v.trim());
-            const row = {};
-            headers.forEach((header, index) => {
-                row[header] = values[index] || '';
-            });
-            data.push(row);
+    const lines = csv.split('\n');
+    console.log(`📊 Total lines found: ${lines.length}`);
+    console.log(`📋 First line (headers): ${lines[0]}`);
+    console.log(`📋 Last line preview: ${lines[lines.length - 1]}`);
+    
+    // Better CSV parsing that handles quoted fields
+    const result = [];
+    let headers = [];
+    
+    for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+        const line = lines[lineIndex].trim();
+        if (!line) continue; // Skip empty lines
+        
+        const fields = [];
+        let field = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            
+            if (char === '"') {
+                inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+                fields.push(field.trim());
+                field = '';
+            } else {
+                field += char;
+            }
+        }
+        fields.push(field.trim()); // Add the last field
+        
+        if (lineIndex === 0) {
+            headers = fields;
+            console.log(`📋 Parsed headers (${headers.length}):`, headers);
+        } else {
+            if (fields.length > 0 && fields[0]) { // Only add non-empty rows
+                const row = {};
+                headers.forEach((header, index) => {
+                    row[header] = fields[index] || '';
+                });
+                result.push(row);
+            }
         }
     }
     
-    return data;
+    console.log(`✅ CSV parsed successfully: ${result.length} data rows`);
+    console.log(`📊 Sample row:`, result[0]);
+    
+    return result;
 }
 
 function updateDashboardWithJSON(data, filename) {
@@ -1169,16 +1205,46 @@ function updateDashboardWithJSON(data, filename) {
 }
 
 function updateDashboardWithCSV(data, filename) {
-    console.log('Processing CSV data from:', filename, data);
+    console.log('🔄 Processing CSV data from:', filename);
+    console.log('📊 CSV Data Preview:', data.length, 'records');
+    console.log('📋 First record sample:', data[0]);
     
-    // Determine data type based on headers
+    // Store in appropriate location based on filename
+    const storageKey = `aeris_file_${filename}`;
+    const fileData = {
+        filename: filename,
+        rawData: data,
+        uploadedAt: new Date().toISOString(),
+        processedData: true
+    };
+    
+    localStorage.setItem(storageKey, JSON.stringify(fileData));
+    console.log(`💾 Stored CSV data with key: ${storageKey}`);
+    
+    // Also store in memory for immediate access
+    if (typeof window.fileStorage === 'undefined') {
+        window.fileStorage = new Map();
+    }
+    window.fileStorage.set(filename, fileData);
+    console.log(`🧠 Stored in memory storage:`, filename);
+    
+    // Determine data type based on headers and filename
     if (data.length > 0) {
         const headers = Object.keys(data[0]).map(h => h.toLowerCase());
+        console.log('📋 Headers detected:', headers);
         
-        if (headers.includes('name') || headers.includes('employee')) {
+        if (filename.toLowerCase().includes('allpeople')) {
+            console.log('✅ Detected as ALLPEOPLE file - will update dashboard');
+            updateDashboardFromAllPeople();
+        } else if (headers.includes('name') || headers.includes('employee')) {
+            console.log('✅ Detected as EMPLOYEE data');
             updateEmployeeData(data);
         } else if (headers.includes('position') || headers.includes('job')) {
+            console.log('✅ Detected as HIRING data');
             updateHiringData({ applications: data });
+        } else {
+            console.log('⚠️ Unknown data type, treating as general employee data');
+            updateEmployeeData(data);
         }
     }
 }
