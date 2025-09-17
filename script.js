@@ -939,7 +939,13 @@ function handleDrop(e) {
 
 function handleFileSelect(e) {
     const files = e.target.files;
-    console.log('Files selected:', files); // Debug log
+    console.log('🔄 Files selected:', files.length, 'files'); // Enhanced debug log
+    
+    // Log each file being uploaded
+    Array.from(files).forEach((file, index) => {
+        console.log(`📁 File ${index + 1}: ${file.name} (${file.size} bytes, ${file.type})`);
+    });
+    
     if (files.length > 0) {
         processUploadedFiles(files);
     }
@@ -1145,7 +1151,12 @@ function parseCSV(csv) {
     const lines = csv.split('\n');
     console.log(`📊 Total lines found: ${lines.length}`);
     console.log(`📋 First line (headers): ${lines[0]}`);
+    console.log(`📋 Second line (first data): ${lines[1]}`);
     console.log(`📋 Last line preview: ${lines[lines.length - 1]}`);
+    
+    // Count non-empty lines
+    const nonEmptyLines = lines.filter(line => line.trim().length > 0);
+    console.log(`📊 Non-empty lines: ${nonEmptyLines.length}`);
     
     // Better CSV parsing that handles quoted fields
     const result = [];
@@ -1188,7 +1199,9 @@ function parseCSV(csv) {
     }
     
     console.log(`✅ CSV parsed successfully: ${result.length} data rows`);
-    console.log(`📊 Sample row:`, result[0]);
+    console.log(`📊 First parsed record:`, result[0]);
+    console.log(`📊 Sample of column I (onboard):`, result[0] ? result[0][headers[8]] : 'N/A');
+    console.log(`📊 Sample of column J (offboard):`, result[0] ? result[0][headers[9]] : 'N/A');
     
     return result;
 }
@@ -3899,3 +3912,39 @@ function debugPeopleCount() {
 
 // Make debug function available globally
 window.debugPeopleCount = debugPeopleCount;
+
+// Function to clear all localStorage data for fresh start
+function clearAllData() {
+    console.log('🧹 CLEARING ALL DATA...');
+    
+    // Clear localStorage
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('aeris_')) {
+            keysToRemove.push(key);
+        }
+    }
+    
+    keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
+        console.log(`🗑️ Removed: ${key}`);
+    });
+    
+    // Clear memory storage
+    if (typeof window.fileStorage !== 'undefined') {
+        window.fileStorage.clear();
+        console.log('🗑️ Cleared memory storage');
+    }
+    
+    console.log('✅ All data cleared! Ready for fresh upload.');
+    
+    // Reset dashboard to default state
+    document.getElementById('totalEmployees').textContent = '0';
+    document.getElementById('activeEmployees').textContent = '0';
+    
+    return 'Data cleared successfully';
+}
+
+// Make clear function available globally
+window.clearAllData = clearAllData;
