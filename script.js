@@ -3786,3 +3786,93 @@ function debugRefreshDashboard() {
 
 // Make debug function available globally
 window.debugRefreshDashboard = debugRefreshDashboard;
+
+// Function to check current people count and debug data
+function debugPeopleCount() {
+    console.log('=== PEOPLE COUNT DEBUG ===');
+    
+    // Check localStorage for allpeople files
+    let allPeopleData = null;
+    let fileName = null;
+    
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('aeris_file_') && key.toLowerCase().includes('allpeople')) {
+            try {
+                const savedData = JSON.parse(localStorage.getItem(key));
+                allPeopleData = savedData;
+                fileName = key.replace('aeris_file_', '');
+                console.log(`📁 Found allpeople file: ${fileName}`);
+                console.log(`📊 Raw data count: ${savedData.rawData ? savedData.rawData.length : 'No rawData'}`);
+                break;
+            } catch (error) {
+                console.error('Error loading allpeople file:', error);
+            }
+        }
+    }
+    
+    if (!allPeopleData) {
+        console.log('❌ No allpeople file found in localStorage');
+        return { total: 0, active: 0, error: 'No data found' };
+    }
+    
+    const employeeData = allPeopleData.rawData;
+    if (!Array.isArray(employeeData)) {
+        console.log('❌ Invalid data format');
+        return { total: 0, active: 0, error: 'Invalid data format' };
+    }
+    
+    // Apply filtering logic
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    console.log(`📅 Today: ${today.toDateString()}`);
+    console.log(`📋 Total records: ${employeeData.length}`);
+    
+    const activeEmployees = employeeData.filter(employee => {
+        const onboardDateStr = employee[Object.keys(employee)[8]] || '';
+        const offboardDateStr = employee[Object.keys(employee)[9]] || '';
+        
+        let onboardDate = null;
+        if (onboardDateStr && onboardDateStr.trim() !== '') {
+            onboardDate = new Date(onboardDateStr);
+            if (isNaN(onboardDate.getTime())) {
+                const parts = onboardDateStr.split('/');
+                if (parts.length === 3) {
+                    onboardDate = new Date(parts[2], parts[0] - 1, parts[1]);
+                }
+            }
+        }
+        
+        let offboardDate = null;
+        if (offboardDateStr && offboardDateStr.trim() !== '') {
+            offboardDate = new Date(offboardDateStr);
+            if (isNaN(offboardDate.getTime())) {
+                const parts = offboardDateStr.split('/');
+                if (parts.length === 3) {
+                    offboardDate = new Date(parts[2], parts[0] - 1, parts[1]);
+                }
+            }
+        }
+        
+        const isOnboarded = !onboardDate || onboardDate <= today;
+        const isNotOffboarded = !offboardDate || offboardDate > today;
+        
+        return isOnboarded && isNotOffboarded;
+    });
+    
+    const result = {
+        total: employeeData.length,
+        active: activeEmployees.length,
+        fileName: fileName,
+        today: today.toDateString()
+    };
+    
+    console.log(`✅ RESULT: ${result.total} total, ${result.active} active`);
+    console.log('=== END DEBUG ===');
+    
+    return result;
+}
+
+// Make debug function available globally
+window.debugPeopleCount = debugPeopleCount;
