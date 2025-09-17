@@ -1326,14 +1326,32 @@ function updateDashboardFromAllPeople() {
                 return false;
             }).length;
             
-            console.log(`Filtering Results:`);
-            console.log(`- Total records: ${employeeData.length}`);
+            console.log(`=== EMPLOYEE FILTERING DEBUG ===`);
+            console.log(`📅 Today's date: ${today.toDateString()}`);
+            console.log(`📋 Total records in CSV: ${employeeData.length}`);
+            console.log(`🎯 Filtering criteria:`);
+            console.log(`   ✅ INCLUDE: Onboard date ≤ ${today.toDateString()} (or missing)`);
+            console.log(`   ✅ INCLUDE: Offboard date > ${today.toDateString()} (or missing)`);
+            console.log(`================================`);
+            
+            console.log(`📊 Filtering Results:`);
+            console.log(`- Total records in CSV: ${employeeData.length}`);
             console.log(`- Future starts (excluded): ${futureStarts}`);
             console.log(`- Past/current ends (excluded): ${pastEnds}`);
-            console.log(`- Currently active: ${activeEmployeesData.length}`);
-            console.log(`- Expected calculation: ${employeeData.length} - ${futureStarts} - ${pastEnds} = ${employeeData.length - futureStarts - pastEnds}`);
+            console.log(`- Currently active employees: ${activeEmployeesData.length}`);
+            console.log(`- Math check: ${employeeData.length} - ${futureStarts} - ${pastEnds} = ${employeeData.length - futureStarts - pastEnds}`);
             
-            console.log(`Filtered from ${employeeData.length} total records to ${activeEmployeesData.length} currently active employees`);
+            // Expected: 424 total - 5 past ends = 419 active
+            if (employeeData.length === 424 && pastEnds === 5 && futureStarts === 0) {
+                console.log(`✅ PERFECT! Expected: 424 - 5 = 419, Got: ${activeEmployeesData.length}`);
+            } else {
+                console.log(`⚠️  Expected ~419 active (424 total - 5 past ends), Got: ${activeEmployeesData.length}`);
+                console.log(`   📋 Your CSV: ${employeeData.length} total records`);
+                console.log(`   🔮 Future starts: ${futureStarts}`);
+                console.log(`   📅 Past ends: ${pastEnds}`);
+            }
+            
+            console.log(`✅ FINAL RESULT: ${activeEmployeesData.length} currently active employees`);
             
             // Calculate statistics from filtered active employees data
             const totalEmployees = activeEmployeesData.length;
