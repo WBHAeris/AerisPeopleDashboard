@@ -1199,19 +1199,38 @@ function updateEmployeeData(employees) {
 
 // New function to specifically handle allpeople file data
 function updateDashboardFromAllPeople() {
-    console.log('Looking for allpeople file data...');
+    console.log('🔄 Looking for allpeople file data...');
+    
+    // Debug: Check what's in localStorage
+    console.log('📋 Checking localStorage for allpeople files...');
+    let foundFiles = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('aeris_file_')) {
+            foundFiles.push(key);
+            if (key.toLowerCase().includes('allpeople')) {
+                console.log(`✅ Found allpeople file: ${key}`);
+            }
+        }
+    }
+    console.log(`📂 Total files in localStorage: ${foundFiles.length}`, foundFiles);
     
     // Look for file with "allpeople" in the name (case insensitive)
     let allPeopleData = null;
     let fileName = null;
     
     // Check in memory storage first
-    for (let [name, data] of window.fileStorage.entries()) {
-        if (name.toLowerCase().includes('allpeople')) {
-            allPeopleData = data;
-            fileName = name;
-            break;
+    if (typeof window.fileStorage !== 'undefined') {
+        for (let [name, data] of window.fileStorage.entries()) {
+            if (name.toLowerCase().includes('allpeople')) {
+                allPeopleData = data;
+                fileName = name;
+                console.log(`✅ Found allpeople in memory: ${name}`);
+                break;
+            }
         }
+    } else {
+        console.log('⚠️ window.fileStorage not initialized');
     }
     
     // If not found in memory, check localStorage
@@ -3677,6 +3696,27 @@ function updateDashboardWithTechPeopleData() {
 document.addEventListener('DOMContentLoaded', function() {
     // Update dashboard with tech people data after a short delay
     setTimeout(() => {
+        console.log('🚀 DOM loaded, calling updateDashboardWithTechPeopleData...');
         updateDashboardWithTechPeopleData();
+        
+        // Also try to update from allpeople data
+        console.log('🚀 Also calling updateDashboardFromAllPeople...');
+        updateDashboardFromAllPeople();
     }, 1000);
 });
+
+// Debug function to manually refresh data (call from browser console)
+function debugRefreshDashboard() {
+    console.log('🔧 DEBUG: Manual dashboard refresh triggered');
+    console.log('📊 Calling updateDashboardFromAllPeople...');
+    const result = updateDashboardFromAllPeople();
+    console.log('📊 updateDashboardFromAllPeople result:', result);
+    
+    console.log('📊 Calling updateDashboardWithTechPeopleData...');
+    updateDashboardWithTechPeopleData();
+    
+    return 'Debug refresh completed - check console for details';
+}
+
+// Make debug function available globally
+window.debugRefreshDashboard = debugRefreshDashboard;
