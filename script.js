@@ -1144,66 +1144,86 @@ function processFileData(file) {
     reader.readAsText(file);
 }
 
+// Robust CSV parsing wrapper preferring PapaParse
 function parseCSV(csv) {
-    console.log('🔍 CSV Parsing Debug:');
-    console.log(`📄 Raw CSV length: ${csv.length} characters`);
-    
-    const lines = csv.split('\n');
-    console.log(`📊 Total lines found: ${lines.length}`);
-    console.log(`📋 First line (headers): ${lines[0]}`);
-    console.log(`📋 Second line (first data): ${lines[1]}`);
-    console.log(`📋 Last line preview: ${lines[lines.length - 1]}`);
-    
-    // Count non-empty lines
-    const nonEmptyLines = lines.filter(line => line.trim().length > 0);
-    console.log(`📊 Non-empty lines: ${nonEmptyLines.length}`);
-    
-    // Better CSV parsing that handles quoted fields
-    const result = [];
-    let headers = [];
-    
-    for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-        const line = lines[lineIndex].trim();
-        if (!line) continue; // Skip empty lines
-        
-        const fields = [];
-        let field = '';
-        let inQuotes = false;
-        
-        for (let i = 0; i < line.length; i++) {
-            const char = line[i];
-            
-            if (char === '"') {
-                inQuotes = !inQuotes;
-            } else if (char === ',' && !inQuotes) {
-                fields.push(field.trim());
-                field = '';
-            } else {
-                field += char;
-            }
+    if (window.Papa) {
+        console.log('🔍 Using PapaParse for CSV parsing');
+        const t0 = performance.now();
+        const parsed = Papa.parse(csv, {
+            header: true,
+            skipEmptyLines: true,
+            dynamicTyping: false,
+            transformHeader: h => h.trim()
+        });
+        const dt = (performance.now() - t0).toFixed(1);
+        if (parsed.errors?.length) {
+            console.warn('CSV parse errors (first 5):', parsed.errors.slice(0,5));
         }
-        fields.push(field.trim()); // Add the last field
-        
-        if (lineIndex === 0) {
-            headers = fields;
-            console.log(`📋 Parsed headers (${headers.length}):`, headers);
-        } else {
-            if (fields.length > 0 && fields[0]) { // Only add non-empty rows
-                const row = {};
-                headers.forEach((header, index) => {
-                    row[header] = fields[index] || '';
-                });
-                result.push(row);
-            }
-        }
+        console.log(`✅ Parsed ${parsed.data.length} rows (${parsed.meta.fields.length} headers) in ${dt}ms`);
+        return parsed.data;
     }
-    
-    console.log(`✅ CSV parsed successfully: ${result.length} data rows`);
-    console.log(`📊 First parsed record:`, result[0]);
-    console.log(`📊 Sample of column I (onboard):`, result[0] ? result[0][headers[8]] : 'N/A');
-    console.log(`📊 Sample of column J (offboard):`, result[0] ? result[0][headers[9]] : 'N/A');
-    
-    return result;
+    console.warn('⚠️ PapaParse not available, falling back to legacy simple parser');
+    const lines = csv.split(/\r?\n/);
+    const headerLine = lines.shift() || '';
+    const headers = headerLine.split(',').map(h=>h.trim());
+    return lines.filter(l=>l.trim()).map(line => {
+        const parts = line.split(',');
+        const row = {}; headers.forEach((h,i)=> row[h] = (parts[i]||'').trim());
+        return row;
+    });
+}
+
+// Header alias mapping & resolution
+const HEADER_ALIASES = {
+    onboard: ['onboard date','onboard','start date','hire date','start','joining date','join date'],
+    offboard: ['offboard date','offboard','end date','termination date','term date','leave date','last day','separation date']
+};
+
+function resolveHeader(list, aliases) {
+    if (!list) return null;
+    const lower = list.map(h=>h.toLowerCase().trim());
+    for (const a of aliases) {
+        const idx = lower.indexOf(a);
+        if (idx !== -1) return list[idx];
+    }
+    return null;
+}
+function buildHeaderMap(sample) {
+    const headers = Object.keys(sample||{});
+    const onboardHeader = resolveHeader(headers, HEADER_ALIASES.onboard);
+    const offboardHeader = resolveHeader(headers, HEADER_ALIASES.offboard);
+    return { headers, onboardHeader, offboardHeader };
+}
+function normalizeDate(d){ d.setHours(0,0,0,0); return d; }
+function parseFlexibleDate(raw){
+    if(!raw || !raw.trim()) return {date:null, valid:false, raw};
+    const s = raw.trim().replace(/\r$/,'');
+    let d = new Date(s); if(!isNaN(d)) return {date:normalizeDate(d), valid:true, raw};
+    let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/); if(m){ d=new Date(m[3].length===2?'20'+m[3]:m[3], m[1]-1, m[2]); if(!isNaN(d)) return {date:normalizeDate(d), valid:true, raw}; }
+    m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/); if(m){ d=new Date(m[1], m[2]-1, m[3]); if(!isNaN(d)) return {date:normalizeDate(d), valid:true, raw}; }
+    return {date:null, valid:false, raw};
+}
+function filterActiveEmployees(rows, headerMap, today=new Date()) {
+    // New rule: Active if onboard <= today AND (offboard missing OR offboard >= today)
+    today = normalizeDate(today);
+    const {onboardHeader, offboardHeader} = headerMap;
+    const stats = { total: rows.length, active:0, futureStarts:0, pastEnds:0, invalidOn:0, invalidOff:0 };
+    if(!onboardHeader || !offboardHeader){
+        return {activeRows: [], stats, error:'Missing onboard/offboard headers'};
+    }
+    const activeRows = [];
+    for(const r of rows){
+        const on = parseFlexibleDate(r[onboardHeader]);
+        const off = parseFlexibleDate(r[offboardHeader]);
+        if(r[onboardHeader] && !on.valid) stats.invalidOn++;
+        if(r[offboardHeader] && !off.valid) stats.invalidOff++;
+        const isOn = !on.date || on.date <= today; // allow missing or past/on today
+        const notOff = !off.date || off.date >= today; // changed from > to >= per requirement
+        if(!isOn && on.date) stats.futureStarts++;
+        if(!notOff && off.date) stats.pastEnds++; // off.date < today counts as past end
+        if(isOn && notOff){ activeRows.push(r); stats.active++; }
+    }
+    return { activeRows, stats, error:null };
 }
 
 function updateDashboardWithJSON(data, filename) {
@@ -1221,6 +1241,14 @@ function updateDashboardWithCSV(data, filename) {
     console.log('🔄 Processing CSV data from:', filename);
     console.log('📊 CSV Data Preview:', data.length, 'records');
     console.log('📋 First record sample:', data[0]);
+    let headerMap = null;
+    if(data.length){
+        headerMap = buildHeaderMap(data[0]);
+        console.log('🧭 Header map:', headerMap);
+        if(!headerMap.onboardHeader || !headerMap.offboardHeader){
+            showNotification('Could not identify onboard/offboard columns', 'warning');
+        }
+    }
     
     // Store in the EXACT format that updateDashboardFromAllPeople expects
     const storageKey = `aeris_file_${filename}`;
@@ -1344,120 +1372,33 @@ function updateDashboardFromAllPeople() {
         const employeeData = allPeopleData.rawData;
         
         if (Array.isArray(employeeData) && employeeData.length > 0) {
-            // Filter for currently active employees only
-            const today = new Date();
-            today.setHours(0, 0, 0, 0); // Set to start of day for comparison
+            const headerMap = buildHeaderMap(employeeData[0]);
+            const { activeRows, stats, error } = filterActiveEmployees(employeeData, headerMap);
+            console.log('📈 Active filter stats:', stats, 'error:', error, 'headerMap:', headerMap);
+            const activeEmployeesData = activeRows;
+            const today = new Date(); today.setHours(0,0,0,0);
             
-            const activeEmployeesData = employeeData.filter(employee => {
-                // Get onboard date from Column I (index 8)
-                const onboardDateStr = employee[Object.keys(employee)[8]] || '';
-                // Get offboard date from Column J (index 9) 
-                const offboardDateStr = employee[Object.keys(employee)[9]] || '';
-                
-                console.log(`🔍 Checking employee: ${employee[Object.keys(employee)[0]] || 'Unknown'}`);
-                console.log(`   📅 Onboard raw: "${onboardDateStr}"`);
-                console.log(`   📅 Offboard raw: "${offboardDateStr}"`);
-                
-                // Parse onboard date
-                let onboardDate = null;
-                if (onboardDateStr && onboardDateStr.trim() !== '') {
-                    onboardDate = new Date(onboardDateStr);
-                    console.log(`   📅 Onboard parsed: ${onboardDate} (valid: ${!isNaN(onboardDate.getTime())})`);
-                    
-                    if (isNaN(onboardDate.getTime())) {
-                        // Try different date formats if needed
-                        const parts = onboardDateStr.split('/');
-                        if (parts.length === 3) {
-                            onboardDate = new Date(parts[2], parts[0] - 1, parts[1]); // MM/DD/YYYY
-                            console.log(`   📅 Onboard retry: ${onboardDate} (valid: ${!isNaN(onboardDate.getTime())})`);
-                        }
-                    }
-                } else {
-                    console.log(`   📅 Onboard: EMPTY/NULL - assuming valid`);
+            // Recompute exclusion diagnostics aligned with headerMap (using new >= rule)
+            let futureStarts = 0, pastEnds = 0;
+            if(headerMap.onboardHeader){
+                for(const emp of employeeData){
+                    const on = parseFlexibleDate(emp[headerMap.onboardHeader]);
+                    if(on.date && on.date > today) futureStarts++;
                 }
-                
-                // Parse offboard date
-                let offboardDate = null;
-                if (offboardDateStr && offboardDateStr.trim() !== '') {
-                    offboardDate = new Date(offboardDateStr);
-                    console.log(`   📅 Offboard parsed: ${offboardDate} (valid: ${!isNaN(offboardDate.getTime())})`);
-                    
-                    if (isNaN(offboardDate.getTime())) {
-                        // Try different date formats if needed
-                        const parts = offboardDateStr.split('/');
-                        if (parts.length === 3) {
-                            offboardDate = new Date(parts[2], parts[0] - 1, parts[1]); // MM/DD/YYYY
-                            console.log(`   📅 Offboard retry: ${offboardDate} (valid: ${!isNaN(offboardDate.getTime())})`);
-                        }
-                    }
-                } else {
-                    console.log(`   📅 Offboard: EMPTY/NULL - assuming still active`);
+            }
+            if(headerMap.offboardHeader){
+                for(const emp of employeeData){
+                    const off = parseFlexibleDate(emp[headerMap.offboardHeader]);
+                    if(off.date && off.date < today) pastEnds++; // strictly before today
                 }
-                
-                // Employee is active if:
-                // 1. Onboard date is today or in the past (or missing/invalid)
-                // 2. Offboard date is in the future (or missing/invalid) 
-                const isOnboarded = !onboardDate || onboardDate <= today;
-                const isNotOffboarded = !offboardDate || offboardDate > today;
-                
-                const isActive = isOnboarded && isNotOffboarded;
-                
-                console.log(`   ✅ Onboarded (${onboardDate ? onboardDate.toDateString() : 'NULL'} <= ${today.toDateString()}): ${isOnboarded}`);
-                console.log(`   ✅ Not offboarded (${offboardDate ? offboardDate.toDateString() : 'NULL'} > ${today.toDateString()}): ${isNotOffboarded}`);
-                console.log(`   🎯 RESULT: ${isActive ? 'ACTIVE' : 'INACTIVE'}`);
-                console.log('---');
-                
-                // Debug specific exclusions
-                if (!isActive) {
-                    const name = employee[Object.keys(employee)[0]] || 'Unknown';
-                    if (!isOnboarded) {
-                        console.log(`❌ EXCLUDED (future start): ${name} - onboard date: ${onboardDateStr} (parsed: ${onboardDate})`);
-                    }
-                    if (!isNotOffboarded) {
-                        console.log(`❌ EXCLUDED (past/current end): ${name} - offboard date: ${offboardDateStr} (parsed: ${offboardDate})`);
-                    }
-                }
-                
-                return isActive;
-            });
-            
-            // Count exclusions for verification
-            const futureStarts = employeeData.filter(emp => {
-                const onboardDateStr = emp[Object.keys(emp)[8]] || '';
-                if (onboardDateStr && onboardDateStr.trim() !== '') {
-                    let onboardDate = new Date(onboardDateStr);
-                    if (isNaN(onboardDate.getTime())) {
-                        const parts = onboardDateStr.split('/');
-                        if (parts.length === 3) {
-                            onboardDate = new Date(parts[2], parts[0] - 1, parts[1]);
-                        }
-                    }
-                    return onboardDate && onboardDate > today;
-                }
-                return false;
-            }).length;
-            
-            const pastEnds = employeeData.filter(emp => {
-                const offboardDateStr = emp[Object.keys(emp)[9]] || '';
-                if (offboardDateStr && offboardDateStr.trim() !== '') {
-                    let offboardDate = new Date(offboardDateStr);
-                    if (isNaN(offboardDate.getTime())) {
-                        const parts = offboardDateStr.split('/');
-                        if (parts.length === 3) {
-                            offboardDate = new Date(parts[2], parts[0] - 1, parts[1]);
-                        }
-                    }
-                    return offboardDate && offboardDate <= today;
-                }
-                return false;
-            }).length;
+            }
             
             console.log(`=== EMPLOYEE FILTERING DEBUG ===`);
             console.log(`📅 Today's date: ${today.toDateString()}`);
             console.log(`📋 Total records in CSV: ${employeeData.length}`);
             console.log(`🎯 Filtering criteria:`);
             console.log(`   ✅ INCLUDE: Onboard date ≤ ${today.toDateString()} (or missing)`);
-            console.log(`   ✅ INCLUDE: Offboard date > ${today.toDateString()} (or missing)`);
+            console.log(`   ✅ INCLUDE: Offboard date ≥ ${today.toDateString()} (or missing)`);
             console.log(`================================`);
             
             console.log(`📊 Filtering Results:`);
@@ -1467,9 +1408,9 @@ function updateDashboardFromAllPeople() {
             console.log(`- Currently active employees: ${activeEmployeesData.length}`);
             console.log(`- Math check: ${employeeData.length} - ${futureStarts} - ${pastEnds} = ${employeeData.length - futureStarts - pastEnds}`);
             
-            // Expected: 424 total - 5 past ends = 419 active
+            // Expected with rule (offboard >= today counts active): total - (offboard < today) = active
             if (employeeData.length === 424 && pastEnds === 5 && futureStarts === 0) {
-                console.log(`✅ PERFECT! Expected: 424 - 5 = 419, Got: ${activeEmployeesData.length}`);
+                console.log(`✅ PERFECT! Expected: 424 - 5 (pastEnds) = 419, Got: ${activeEmployeesData.length}`);
             } else {
                 console.log(`⚠️  Expected ~419 active (424 total - 5 past ends), Got: ${activeEmployeesData.length}`);
                 console.log(`   📋 Your CSV: ${employeeData.length} total records`);
@@ -1480,13 +1421,8 @@ function updateDashboardFromAllPeople() {
             console.log(`✅ FINAL RESULT: ${activeEmployeesData.length} currently active employees`);
             
             // Calculate statistics from filtered active employees data
-            const totalEmployees = activeEmployeesData.length;
-            
-            // Count active employees (check various possible status field names)
-            const activeEmployees = activeEmployeesData.filter(emp => {
-                const status = (emp.status || emp.Status || emp.employment_status || emp.active || '').toString().toLowerCase();
-                return status === 'active' || status === 'true' || status === '1' || status === 'yes';
-            }).length;
+            const totalEmployees = employeeData.length; // total before filtering
+            const activeEmployees = activeEmployeesData.length; // date-based active
             
             // Count employees on leave from active employees
             const onLeaveEmployees = activeEmployeesData.filter(emp => {
@@ -1499,66 +1435,40 @@ function updateDashboardFromAllPeople() {
             const currentMonth = new Date().getMonth();
             const currentYear = new Date().getFullYear();
             
-            activeEmployeesData.forEach(emp => {
-                // Use Column I 'onboard date' (index 8, zero-based)
-                const onboardDate = emp['onboard date'] || 
-                                   emp['Onboard Date'] || 
-                                   emp['ONBOARD DATE'] || 
-                                   emp['onboard_date'] ||
-                                   emp[Object.keys(emp)[8]] || // Column I (9th column, zero-based index 8)
-                                   null;
-                
-                if (onboardDate) {
-                    const empDate = new Date(onboardDate);
-                    if (empDate.getMonth() === currentMonth && empDate.getFullYear() === currentYear) {
+            if(headerMap.onboardHeader){
+                activeEmployeesData.forEach(emp => {
+                    const on = parseFlexibleDate(emp[headerMap.onboardHeader]);
+                    if(on.date && on.date.getMonth() === currentMonth && on.date.getFullYear() === currentYear){
                         newHiresThisMonth++;
                     }
-                }
-            });
+                });
+            }
             
             // Calculate new additions year to date using Column I 'onboard date'
             let newAdditionsYTD = 0;
             const currentDate = new Date();
             
-            activeEmployeesData.forEach(emp => {
-                // Use Column I 'onboard date' (index 8, zero-based)
-                const onboardDate = emp['onboard date'] || 
-                                   emp['Onboard Date'] || 
-                                   emp['ONBOARD DATE'] || 
-                                   emp['onboard_date'] ||
-                                   emp[Object.keys(emp)[8]] || // Column I (9th column, zero-based index 8)
-                                   null;
-                
-                if (onboardDate) {
-                    const empDate = new Date(onboardDate);
-                    // Check if onboard date is <= today and in current year
-                    if (empDate <= currentDate && empDate.getFullYear() === currentYear) {
+            if(headerMap.onboardHeader){
+                activeEmployeesData.forEach(emp => {
+                    const on = parseFlexibleDate(emp[headerMap.onboardHeader]);
+                    if(on.date && on.date <= currentDate && on.date.getFullYear() === currentYear){
                         newAdditionsYTD++;
                     }
-                }
-            });
+                });
+            }
             
             // Calculate employees leaving by end of this month using Column J 'offboard date'
             let leavingThisMonth = 0;
             const endOfMonth = new Date(currentYear, currentMonth + 1, 0); // Last day of current month
             
-            employeeData.forEach(emp => {
-                // Use Column J 'offboard date' (index 9, zero-based)
-                const offboardDate = emp['offboard date'] || 
-                                    emp['Offboard Date'] || 
-                                    emp['OFFBOARD DATE'] || 
-                                    emp['offboard_date'] ||
-                                    emp[Object.keys(emp)[9]] || // Column J (10th column, zero-based index 9)
-                                    null;
-                
-                if (offboardDate) {
-                    const empDate = new Date(offboardDate);
-                    // Check if offboard date is by end of current month
-                    if (empDate.getMonth() === currentMonth && empDate.getFullYear() === currentYear) {
+            if(headerMap.offboardHeader){
+                employeeData.forEach(emp => {
+                    const off = parseFlexibleDate(emp[headerMap.offboardHeader]);
+                    if(off.date && off.date.getMonth() === currentMonth && off.date.getFullYear() === currentYear){
                         leavingThisMonth++;
                     }
-                }
-            });
+                });
+            }
             
             // Update dashboard statistics
             updateStatCard('Total Tech People Count', totalEmployees);
@@ -1808,20 +1718,11 @@ function updateDashboardWithSpecificFile(employeeData, filename) {
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
     
+    const specificHeaderMap = buildHeaderMap(employeeData[0]);
     employeeData.forEach(emp => {
-        // Use Column I 'onboard date' (index 8, zero-based)
-        const onboardDate = emp['onboard date'] || 
-                           emp['Onboard Date'] || 
-                           emp['ONBOARD DATE'] || 
-                           emp['onboard_date'] ||
-                           emp[Object.keys(emp)[8]] || // Column I (9th column, zero-based index 8)
-                           null;
-        
-        if (onboardDate) {
-            const empDate = new Date(onboardDate);
-            if (empDate.getMonth() === currentMonth && empDate.getFullYear() === currentYear) {
-                newHiresThisMonth++;
-            }
+        const on = specificHeaderMap.onboardHeader ? parseFlexibleDate(emp[specificHeaderMap.onboardHeader]) : {date:null};
+        if (on.date && on.date.getMonth() === currentMonth && on.date.getFullYear() === currentYear) {
+            newHiresThisMonth++;
         }
     });
     
@@ -3652,7 +3553,7 @@ function updateDashboardWithTechPeopleData() {
         
         // Count exclusions for verification
         const futureStarts = realAllPeopleData.filter(emp => {
-            const onboardDateStr = emp[Object.keys(emp)[8]] || '';
+        const onboardDateStr = specificHeaderMap.onboardHeader ? emp[specificHeaderMap.onboardHeader] : '';
             if (onboardDateStr && onboardDateStr.trim() !== '') {
                 let onboardDate = new Date(onboardDateStr);
                 if (isNaN(onboardDate.getTime())) {
@@ -3667,7 +3568,7 @@ function updateDashboardWithTechPeopleData() {
         }).length;
         
         const pastEnds = realAllPeopleData.filter(emp => {
-            const offboardDateStr = emp[Object.keys(emp)[9]] || '';
+        const offboardDateStr = specificHeaderMap.offboardHeader ? emp[specificHeaderMap.offboardHeader] : '';
             if (offboardDateStr && offboardDateStr.trim() !== '') {
                 let offboardDate = new Date(offboardDateStr);
                 if (isNaN(offboardDate.getTime())) {

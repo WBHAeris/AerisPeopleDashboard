@@ -9,6 +9,17 @@
     <title>Aeris Tech People Dashboard</title>
     <link rel="stylesheet" href="styles.css?v=2025081301">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Robust CSV Parser (PapaParse) -->
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js" integrity="sha256-vqA2vRjEXsPuArlTc95xJMu38xpv8uKXu95syEHCqMY=" crossorigin="anonymous"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            if (!window.Papa) {
+                console.error('PapaParse failed to load – falling back to legacy parser');
+            } else {
+                console.log('✅ PapaParse loaded');
+            }
+        });
+    </script>
 </head>
 <body>
     <div class="dashboard-container">

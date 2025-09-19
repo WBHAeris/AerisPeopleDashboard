@@ -330,22 +330,28 @@ function processSTLTAndAllPeopleData() {
         console.log(`Starting mapping with ${allPeopleData.length} total people`);
         console.log('Available functional heads from sTLT CSV:', Object.values(stltGroups).map(g => g.leader));
         
+        // Derive column order once (Column N / O mapping) with alias detection
+        const sampleKeys = allPeopleData.length ? Object.keys(allPeopleData[0]) : [];
+        // Column letters: N=14th (index 13), O=15th (index 14)
+        const colNIndex = 13 < sampleKeys.length ? 13 : -1;
+        const colOIndex = 14 < sampleKeys.length ? 14 : -1;
+        const functionalHeadAliases = ['functional head','functional_head','stlt','sTLT','STLT','team','department','reports to functional head'];
+        const managerAliases = ['manager','people manager','reports to','reports_to','supervisor','line manager'];
+        function resolveAlias(row, aliases){
+            for(const a of aliases){
+                const exact = Object.keys(row).find(k => k.toLowerCase().trim() === a.toLowerCase());
+                if(exact) return row[exact];
+            }
+            return null;
+        }
         allPeopleData.forEach((employee, index) => {
-            // Get functional head name from Column N (who this person reports to)
-            const empReportsTo = employee['sTLT'] || 
-                               employee['stlt'] || 
-                               employee['STLT'] || 
-                               employee['Team'] ||
-                               employee['Department'] ||
-                               employee[Object.keys(employee)[13]] || // Column N - Functional Head Name
-                               'Unassigned';
-            
-            // Get immediate manager from Column O
-            const empManager = employee['Manager'] ||
-                             employee['manager'] ||
-                             employee['Reports To'] ||
-                             employee[Object.keys(employee)[14]] || // Column O - Manager Name
-                             null;
+            let empReportsTo = resolveAlias(employee, functionalHeadAliases);
+            if(!empReportsTo && colNIndex !== -1) empReportsTo = employee[sampleKeys[colNIndex]];
+            empReportsTo = (empReportsTo || '').toString().trim() || 'Unassigned';
+
+            let empManager = resolveAlias(employee, managerAliases);
+            if(!empManager && colOIndex !== -1) empManager = employee[sampleKeys[colOIndex]];
+            empManager = empManager ? empManager.toString().trim() : null;
             
             const empName = employee['Name'] || employee['Full Name'] || 'Unknown';
             const empRole = employee['Position'] || employee['Job Title'] || '';
@@ -395,7 +401,7 @@ function processSTLTAndAllPeopleData() {
                 });
                 
                 // Track unique managers from Column O (these are managers under this functional head)
-                if (empManager && empManager.trim() !== '') {
+                if (empManager && empManager.trim() !== '' && empManager.toLowerCase() !== 'unassigned') {
                     const normalizedManager = empManager.trim();
                     const functionalHeadName = stltGroups[matchedFunctionalArea].leader;
                     
@@ -548,99 +554,87 @@ function refreshRealTeamData() {
     }
 }
 
-// Load real data or fallback to hardcoded data
-let realTeamData = [];
+// Explicit sample data (only used if neither sTLT nor allpeople present)
+const SAMPLE_PORTAL_DATA = [
+    {
+        name: "Sample Technology Head",
+        title: "(Sample) Technology Division Head",
+        department: "technology",
+        reports: 0,
+        email: "sample.head@company.com",
+        directReports: ["Sample Manager A", "Sample Manager B"],
+        sample: true
+    }
+];
 
-// Try to load real data from both sTLT and allpeople CSV files
+let realTeamData = [];
+let usedSampleFallback = false;
+
 const processedData = processSTLTAndAllPeopleData();
 if (processedData && processedData.stltCards.length > 0) {
     realTeamData = processedData.stltCards;
-    console.log('Using real sTLT and allpeople CSV data for Tech People Portal:', realTeamData.length, 'sTLTs');
+    console.log('✅ Tech People Portal using real hierarchical data:', realTeamData.length, 'cards');
 } else {
-    // Fallback to hardcoded data if no real data available
-    console.log('No real CSV data found, using fallback hardcoded data');
-    realTeamData = [
-        {
-            name: "Stephen Blackburn",
-            title: "Senior VP of Technology",
-            department: "infrastructure",
-            reports: 112,
-            email: "stephen.blackburn@company.com",
-            directReports: ["Vikas Sinha", "Gaurav Jain", "Christopher Baynes", "Rajat Prabhakar", "Bhanu Singh", "Rajesh Kumar", "Manoj Mehta", "Akash Sinha"]
-        },
-        {
-            name: "Eran Netanel",
-            title: "Senior VP of Technology",
-            department: "quality",
-            reports: 98,
-            email: "eran.netanel@company.com",
-            directReports: ["Sachin Dev", "Deepti Rawat", "Harish Taneja", "Abhishek Arya", "Sreyas Chakravarthi", "Anuj Solanki", "Shubhang Yadav", "Vikas Sehgal"]
-        },
-        {
-            name: "Claudio Taglienti",
-            title: "VP of Technology",
-            department: "quality", 
-            reports: 75,
-            email: "claudio.taglienti@company.com",
-            directReports: ["Nikhil Sule", "George Rusu", "Manoj Sharma", "Nikhil Agrawal", "Karan Gupta", "Vinay Kumar", "Sandeep Singh"]
-        },
-        {
-            name: "Subu Balakrishnan",
-            title: "Director of Technology",
-            department: "quality",
-            reports: 44,
-            email: "subu.balakrishnan@company.com",
-            directReports: ["Siddharth Asthana", "Nishith Murab", "Tazeem Ahmed", "Rajiv Bharti", "Mukesh Kumar", "Ankit Sharma", "Rohit Gupta", "Priya Singh"]
-        },
-        {
-            name: "Asit Goel",
-            title: "Senior Technology Manager", 
-            department: "quality",
-            reports: 26,
-            email: "asit.goel@company.com",
-            directReports: ["Karan Kapoor", "Vinkal Kumar", "Rajesh Yadav", "Amit Singh", "Neha Agarwal"]
-        },
-        {
-            name: "Drew Johnson",
-            title: "Senior Technology Manager",
-            department: "architecture",
-            reports: 13,
-            email: "drew.johnson@company.com",
-            directReports: ["Michael Chen", "Sarah Wilson", "David Kumar", "Lisa Thompson"]
-        },
-        {
-            name: "Ronnie Pettersson",
-            title: "Senior Technology Manager",
-            department: "engineering",
-            reports: 9,
-            email: "ronnie.pettersson@company.com",
-            directReports: ["Erik Johansson", "Anna Lindberg", "Magnus Olsson"]
-        },
-        {
-            name: "Narendra Sharma",
-            title: "Senior Technology Manager",
-            department: "architecture",
-            reports: 7,
-            email: "narendra.sharma@company.com",
-            directReports: ["Arun Kumar", "Vijay Singh"]
-        },
-        {
-            name: "Fredrik Janson",
-            title: "Senior Technology Manager",
-            department: "engineering",
-            reports: 6,
-            email: "fredrik.janson@company.com",
-            directReports: ["Johan Andersson", "Emma Carlsson", "Lars Nielsen"]
-        },
-        {
-            name: "Mircea Costache",
-            title: "Senior Technology Manager",
-            department: "engineering",
-            reports: 4,
-            email: "mircea.costache@company.com",
-            directReports: ["Adrian Popescu"]
-        }
-    ];
+    // Try synthesizing from allpeople alone
+    const allPeople = loadRealEmployeeData();
+    if (allPeople && allPeople.length) {
+        console.log('ℹ️ No sTLT data found; synthesizing hierarchy from allpeople only');
+        // Group by Manager (or Reports To) to create pseudo-functional areas
+        const headerMap = buildHeaderMap(allPeople[0] || {}); // reuse logic if available globally; else lightweight
+        const managerKey = ['Manager','manager','Reports To','reports to','Supervisor','supervisor']
+            .find(k => k in (allPeople[0]||{})) || Object.keys(allPeople[0]||{})[0];
+        const groups = {};
+        allPeople.forEach(emp => {
+            const manager = (emp[managerKey] || 'Unassigned').trim();
+            if(!groups[manager]) groups[manager] = [];
+            groups[manager].push(emp);
+        });
+        // Choose a top-level head heuristically: largest group manager name containing 'cto' or first manager
+        const managerNames = Object.keys(groups);
+        const topName = managerNames.find(n => /cto|chief|head/i.test(n)) || managerNames[0] || 'Technology Head';
+        const cards = [];
+        // Top card
+        cards.push({
+            name: topName,
+            title: 'Technology Division (Synthesized)',
+            department: 'technology',
+            departmentName: 'Technology',
+            reports: allPeople.length - 1,
+            headcount: allPeople.length - 1,
+            email: `${topName.toLowerCase().replace(/\s+/g,'.')}@company.com`,
+            directReports: managerNames.filter(n => n !== topName),
+            stlt: 'Technology',
+            functionalArea: 'technology',
+            topManager: topName,
+            totalManagers: managerNames.length - 1,
+            isTopLevel: true
+        });
+        managerNames.forEach(mgr => {
+            if(mgr === topName) return;
+            const list = groups[mgr];
+            cards.push({
+                name: mgr || 'Unassigned',
+                title: `${mgr || 'Unassigned'} Team`,
+                department: 'technology',
+                departmentName: 'Technology',
+                reports: list.length,
+                headcount: list.length,
+                email: `${(mgr||'team').toLowerCase().replace(/\s+/g,'.')}@company.com`,
+                directReports: [],
+                stlt: mgr,
+                functionalArea: 'technology',
+                topManager: mgr,
+                totalManagers: 0,
+                reportsTo: topName,
+                isSubTeam: true
+            });
+        });
+        realTeamData = cards;
+    } else {
+        console.warn('⚠️ No sTLT or allpeople data found – using SAMPLE_PORTAL_DATA');
+        realTeamData = SAMPLE_PORTAL_DATA;
+        usedSampleFallback = true;
+    }
 }
 
 // Utility Functions
@@ -742,6 +736,8 @@ function updateStats(data = realTeamData) {
     
     // Get data from both sources
     let stltCount = 0;
+    let totalPeople = 0;
+    let avgSTLTSize = 0;
     let functionalAreasCount = 0;
     
     try {
@@ -796,6 +792,15 @@ function updateStats(data = realTeamData) {
             functionalAreasCount = new Set(data.map(m => m.department)).size;
             console.log(`Using processed data: ${stltCount} sTLTs, ${functionalAreasCount} functional areas`);
         }
+        // Derive total people from cards if allpeople not directly available
+        try {
+            const allPeople = loadRealEmployeeData();
+            totalPeople = allPeople ? allPeople.length : data.reduce((sum,c)=> sum + (c.headcount || c.reports || 0), 0);
+        } catch(_) { totalPeople = data.reduce((sum,c)=> sum + (c.headcount || c.reports || 0), 0); }
+        if (stltCount > 0) {
+            const sizes = data.filter(c=>!c.isTopLevel).map(c=> c.headcount || c.reports || 0);
+            if (sizes.length) avgSTLTSize = Math.round((sizes.reduce((a,b)=>a+b,0)/sizes.length)*10)/10; else avgSTLTSize = 0;
+        }
         
     } catch (error) {
         console.log('Error accessing CSV data, using fallback calculations:', error);
@@ -811,13 +816,7 @@ function updateStats(data = realTeamData) {
     console.log(`Stats updated: ${stltCount} sTLTs (from sTLT CSV), ${functionalAreasCount} functional areas (from sTLT CSV)`);
     
     // Return the stats for external use
-    return {
-        totalSTLTs: stltCount,
-        totalPeople: totalPeople,
-        avgSTLTSize: avgSTLTSize,
-        functionalAreas: functionalAreasCount,
-        dataSource: 'csv'
-    };
+    return { totalSTLTs: stltCount, totalPeople, avgSTLTSize, functionalAreas: functionalAreasCount, dataSource: 'csv' };
 }
 
 // Interactive Functions

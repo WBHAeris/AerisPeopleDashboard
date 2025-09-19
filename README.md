@@ -35,6 +35,57 @@ A modern, responsive dashboard for managing Aeris Tech's people operations, incl
 2. **Open `index.html`** in your web browser
 3. **Navigate** through the dashboard using the sidebar menu
 
+### Optional: Run via Local Static Server (Recommended)
+While you can double‑click `index.html`, using the included lightweight Node server avoids certain browser security restrictions and lets you view logs.
+
+1. Install Node.js (if not already installed) from https://nodejs.org
+2. In this folder run:
+	```powershell
+	node server.js 58123
+	```
+	Then browse: http://127.0.0.1:58123/
+
+### One-Command Smart Startup
+Use the idempotent launcher (starts only if not already running):
+```powershell
+./start-dashboard.ps1 -Port 58123 -Open
+```
+Or the auto‑restart runner:
+```powershell
+./run-dashboard.ps1 -Port 58123 -Open
+```
+
+### What the Scripts Do
+| Script | Purpose |
+|--------|---------|
+| `server.js` | Minimal static file server (no dependencies) |
+| `run-dashboard.ps1` | Auto-restart wrapper; restarts if the server crashes |
+| `start-dashboard.ps1` | Safe idempotent launcher (only starts a new instance if port free) |
+
+### Quick Verification Commands
+In a second PowerShell window (do not close the server window):
+```powershell
+Test-NetConnection -ComputerName 127.0.0.1 -Port 58123 | Select-Object -ExpandProperty TcpTestSucceeded
+(Invoke-WebRequest -UseBasicParsing -Uri http://127.0.0.1:58123/).StatusCode
+```
+Expected: `True` and `200`.
+
+### Startup at User Logon (Windows Task Scheduler)
+1. Open Task Scheduler > Create Task.
+2. General: Name = "Aeris Dashboard"; Run only when user is logged on.
+3. Trigger: At log on (your user).
+4. Action: Start a program.
+	- Program/script: `powershell.exe`
+	- Arguments: `-NoLogo -ExecutionPolicy Bypass -File "<full-path>\start-dashboard.ps1" -Port 58123 -Minimized -Open`
+	- Start in: folder containing the script.
+5. Save. Log off/on to confirm the browser tab opens and server logs appear in a minimized window.
+
+### Minimal Fallback Test (If Troubleshooting)
+```powershell
+node -e "require('http').createServer((q,r)=>r.end('ok')).listen(58123,'0.0.0.0',()=>console.log('mini up'))"
+```
+Browse to http://127.0.0.1:58123/ and expect "ok". If that works but `server.js` does not, inspect console errors.
+
 ## File Structure
 
 ```
