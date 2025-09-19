@@ -278,7 +278,8 @@ function processSTLTAndAllPeopleData() {
     const stltGroups = {};
     const functionalAreas = new Set();
     let technologyHead = null;
-    let totalTechHeadcount = 0;
+    let totalTechHeadcount = 0; // includes head once assigned
+    let staffOnlyHeadcount = 0; // excludes division head
     
     // Find the Technology head (Drew Johnson) and collect all functional areas
     stltData.forEach((record, index) => {
@@ -324,8 +325,9 @@ function processSTLTAndAllPeopleData() {
     
     // Calculate headcount per functional area from allpeople data
     if (allPeopleData && allPeopleData.length > 0) {
-        // First, calculate total technology headcount (all people minus Drew)
-        totalTechHeadcount = allPeopleData.length - 1; // Exclude Drew Johnson from count
+    // Compute both totals: including and excluding the division head
+    totalTechHeadcount = allPeopleData.length; // Include everyone
+    // We'll derive staffOnlyHeadcount by subtracting the head if present below
         
         console.log(`Starting mapping with ${allPeopleData.length} total people`);
         console.log('Available functional heads from sTLT CSV:', Object.values(stltGroups).map(g => g.leader));
@@ -359,6 +361,7 @@ function processSTLTAndAllPeopleData() {
             // Skip Drew Johnson from functional area assignments (he's the overall head)
             const isDrawJohnson = empName.toLowerCase().includes('drew') && empName.toLowerCase().includes('johnson');
             if (isDrawJohnson) {
+                staffOnlyHeadcount = totalTechHeadcount - 1; // derive once
                 console.log(`Skipping ${empName} from functional area assignments (Technology Head)`);
                 return;
             }
@@ -443,7 +446,11 @@ function processSTLTAndAllPeopleData() {
             }
         });
         
-        console.log(`\nTotal Technology Division headcount: ${totalTechHeadcount} (excluding Drew Johnson)`);
+        if (!staffOnlyHeadcount) {
+            // Fallback if we never matched the head name in loop (naming variance)
+            staffOnlyHeadcount = totalTechHeadcount - 1;
+        }
+        console.log(`\nTechnology Division headcount: Total=${totalTechHeadcount} (incl. head), Staff=${staffOnlyHeadcount} (excl. head)`);
         console.log('\nFinal functional area mapping results:');
         Object.keys(stltGroups).forEach(area => {
             if (stltGroups[area].isSubTeam) {
@@ -479,8 +486,10 @@ function processSTLTAndAllPeopleData() {
             title: 'Technology Division',
             department: 'technology',
             departmentName: 'Technology',
-            reports: totalTechHeadcount,
-            headcount: totalTechHeadcount,
+            reports: staffOnlyHeadcount, // direct reports (span) excludes head
+            headcount: totalTechHeadcount, // full division including head
+            staffHeadcount: staffOnlyHeadcount,
+            totalHeadcount: totalTechHeadcount,
             email: `${technologyHead.toLowerCase().replace(/\s+/g, '.')}@company.com`,
             directReports: Array.from(new Set(Object.values(stltGroups)
                 .filter(team => team.isSubTeam)
@@ -523,7 +532,7 @@ function processSTLTAndAllPeopleData() {
     });
     
     console.log('Generated hierarchical sTLT cards:', stltCards.length, 'cards');
-    console.log('Technology Head:', technologyHead, 'with', totalTechHeadcount, 'total people');
+    console.log('Technology Head:', technologyHead, 'with', totalTechHeadcount, 'total (including head) and', staffOnlyHeadcount, 'staff');
     console.log('Functional areas under Technology:', Array.from(functionalAreas));
     
     return {
