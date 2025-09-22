@@ -1239,6 +1239,27 @@ function filterActiveEmployees(rows, headerMap, today=new Date()) {
     return { activeRows, stats, error:null };
 }
 
+// Unified helper: returns array of active employees given raw rows.
+// Active definition (authoritative): onboard date <= today AND (offboard date missing OR offboard date >= today).
+// Falls back to status-based (status == 'active') only if headers missing.
+function computeActiveEmployees(rows){
+    if(!Array.isArray(rows) || rows.length===0) return {active:[], method:'empty'};
+    const headerMap = buildHeaderMap(rows[0]);
+    const today = new Date(); today.setHours(0,0,0,0);
+    if(headerMap.onboardHeader && headerMap.offboardHeader){
+        const {activeRows, stats} = filterActiveEmployees(rows, headerMap, today);
+        console.log(`ℹ️ Active (date-based) => ${activeRows.length} of ${rows.length}`, stats);
+        return {active:activeRows, method:'date', stats};
+    }
+    // Fallback
+    const fallback = rows.filter(r=>{
+        const status = (r.status||r.Status||r.employment_status||'').toString().toLowerCase();
+        return status==='active' || status==='true' || status==='1' || status==='yes';
+    });
+    console.warn('⚠️ Using fallback status-based active calculation. Add correct onboard/offboard headers for date logic.');
+    return {active:fallback, method:'status', stats:{total:rows.length, active:fallback.length}};
+}
+
 function updateDashboardWithJSON(data, filename) {
     console.log('Processing JSON data from:', filename, data);
     
@@ -1313,17 +1334,11 @@ function updateDashboardWithCSV(data, filename) {
 }
 
 function updateEmployeeData(employees) {
-    // Update employee statistics
     const totalEmployees = employees.length;
-    const activeEmployees = employees.filter(emp => 
-        emp.status && emp.status.toLowerCase() === 'active'
-    ).length;
-    
-    // Update stat cards
+    const {active:activeRows, method} = computeActiveEmployees(employees);
     updateStatCard('Total Tech People Count', totalEmployees);
-    updateStatCard('Active Tracking', activeEmployees);
-    
-    showNotification(`Updated dashboard with ${totalEmployees} employee records`, 'success');
+    updateStatCard('Active Tracking', activeRows.length);
+    showNotification(`Updated dashboard with ${totalEmployees} employee records (active method: ${method})`, 'success');
 }
 
 // New function to specifically handle allpeople file data
@@ -1435,7 +1450,7 @@ function updateDashboardFromAllPeople() {
             
             // Calculate statistics from filtered active employees data
             const totalEmployees = employeeData.length; // total before filtering
-            const activeEmployees = activeEmployeesData.length; // date-based active
+            const activeEmployees = activeEmployeesData.length; // unified date-based active
             
             // Count employees on leave from active employees
             const onLeaveEmployees = activeEmployeesData.filter(emp => {
@@ -1716,10 +1731,8 @@ function updateDashboardWithSpecificFile(employeeData, filename) {
     // Calculate statistics
     const totalEmployees = employeeData.length;
     
-    const activeEmployees = employeeData.filter(emp => {
-        const status = (emp.status || emp.Status || emp.employment_status || emp.active || '').toString().toLowerCase();
-        return status === 'active' || status === 'true' || status === '1' || status === 'yes';
-    }).length;
+    const {active:activeRows, method:activeMethod} = computeActiveEmployees(employeeData);
+    const activeEmployees = activeRows.length;
     
     const onLeaveEmployees = employeeData.filter(emp => {
         const status = (emp.status || emp.Status || emp.employment_status || '').toString().toLowerCase();
@@ -1767,7 +1780,7 @@ function updateDashboardWithSpecificFile(employeeData, filename) {
     // Update tracking table
     updateTrackingTable(employeeData);
     
-    console.log(`Dashboard updated with ${filename}: ${totalEmployees} employees, ${activeEmployees} active, ${newHiresThisMonth} new hires this month, ${newAdditionsYTD} YTD additions, ${leavingThisMonth} leaving this month.`);
+    console.log(`Dashboard updated with ${filename}: ${totalEmployees} employees, ${activeEmployees} active (method: ${activeMethod}), ${newHiresThisMonth} new hires this month, ${newAdditionsYTD} YTD additions, ${leavingThisMonth} leaving this month.`);
 }
 
 // Enhanced stat card update with animation
