@@ -1175,8 +1175,9 @@ function parseCSV(csv) {
 
 // Header alias mapping & resolution
 const HEADER_ALIASES = {
-    onboard: ['onboard date','onboard','start date','hire date','start','joining date','join date'],
-    offboard: ['offboard date','offboard','end date','termination date','term date','leave date','last day','separation date']
+    // Added common misspellings (e.g. "Onbaord Date") so metrics don't silently zero out.
+    onboard: ['onboard date','onboard','start date','hire date','start','joining date','join date','onbaord date','onbaord'],
+    offboard: ['offboard date','offboard','end date','termination date','term date','leave date','last day','separation date','offbaord date','offbaord']
 };
 
 function resolveHeader(list, aliases) {
@@ -1192,6 +1193,18 @@ function buildHeaderMap(sample) {
     const headers = Object.keys(sample||{});
     const onboardHeader = resolveHeader(headers, HEADER_ALIASES.onboard);
     const offboardHeader = resolveHeader(headers, HEADER_ALIASES.offboard);
+    if(!onboardHeader) {
+        console.warn('⚠️ Could not detect Onboard / Start date column. Checked aliases:', HEADER_ALIASES.onboard.join(', '));
+        console.warn('   Available headers:', headers);
+    } else {
+        console.log('✅ Detected onboard/start header:', onboardHeader);
+    }
+    if(!offboardHeader) {
+        console.warn('⚠️ Could not detect Offboard / End date column. Checked aliases:', HEADER_ALIASES.offboard.join(', '));
+        console.warn('   Available headers:', headers);
+    } else {
+        console.log('✅ Detected offboard/end header:', offboardHeader);
+    }
     return { headers, onboardHeader, offboardHeader };
 }
 function normalizeDate(d){ d.setHours(0,0,0,0); return d; }
@@ -1713,28 +1726,48 @@ function updateDashboardWithSpecificFile(employeeData, filename) {
         return status.includes('leave') || status.includes('vacation') || status.includes('absent');
     }).length;
     
-    // Calculate new hires this month using Column I 'onboard date'
-    let newHiresThisMonth = 0;
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
-    
+    // Metric definitions (per user):
+    // New Hires (This Month): count of rows where onboard date month/year == today's month/year.
+    // New Additions (Year to Date): count of rows where onboard date year == today's year.
+    // Leaving This Month: count of rows where offboard date <= today AND offboard date's month/year == today's month/year.
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
     const specificHeaderMap = buildHeaderMap(employeeData[0]);
+
+    let newHiresThisMonth = 0;
+    let newAdditionsYTD = 0;
+    let leavingThisMonth = 0;
+
     employeeData.forEach(emp => {
+        // Onboard date processing
         const on = specificHeaderMap.onboardHeader ? parseFlexibleDate(emp[specificHeaderMap.onboardHeader]) : {date:null};
-        if (on.date && on.date.getMonth() === currentMonth && on.date.getFullYear() === currentYear) {
-            newHiresThisMonth++;
+        if (on.date) {
+            if (on.date.getFullYear() === currentYear) {
+                newAdditionsYTD++;
+                if (on.date.getMonth() === currentMonth) {
+                    newHiresThisMonth++;
+                }
+            }
+        }
+        // Offboard date processing for "Leaving This Month"
+        const off = specificHeaderMap.offboardHeader ? parseFlexibleDate(emp[specificHeaderMap.offboardHeader]) : {date:null};
+        if (off.date && off.date <= today && off.date.getMonth() === currentMonth && off.date.getFullYear() === currentYear) {
+            leavingThisMonth++;
         }
     });
-    
-    // Update dashboard statistics with animation
+
+    // Update dashboard statistics with animation (include new additions & leaving metrics)
     updateStatCardWithAnimation('Total Tech People Count', totalEmployees);
     updateStatCardWithAnimation('Active Tracking', activeEmployees);
     updateStatCardWithAnimation('New Hires (This Month)', newHiresThisMonth);
+    updateStatCardWithAnimation('New Additions (Year to Date)', newAdditionsYTD);
+    updateStatCardWithAnimation('Leaving This Month', leavingThisMonth);
     
     // Update tracking table
     updateTrackingTable(employeeData);
     
-    console.log(`Dashboard updated with ${filename}: ${totalEmployees} employees, ${activeEmployees} active`);
+    console.log(`Dashboard updated with ${filename}: ${totalEmployees} employees, ${activeEmployees} active, ${newHiresThisMonth} new hires this month, ${newAdditionsYTD} YTD additions, ${leavingThisMonth} leaving this month.`);
 }
 
 // Enhanced stat card update with animation
@@ -3616,7 +3649,7 @@ function updateDashboardWithTechPeopleData() {
             title: "Senior VP of Technology",
             department: "infrastructure",
             reports: 112,
-            email: "stephen.blackburn@company.com",
+            email: "stephen.blackburn@aeris.net",
             directReports: ["Vikas Sinha", "Gaurav Jain", "Christopher Baynes", "Rajat Prabhakar", "Bhanu Singh", "Rajesh Kumar", "Manoj Mehta", "Akash Sinha"]
         },
         {
@@ -3624,7 +3657,7 @@ function updateDashboardWithTechPeopleData() {
             title: "Senior VP of Technology",
             department: "quality",
             reports: 98,
-            email: "eran.netanel@company.com",
+            email: "eran.netanel@aeris.net",
             directReports: ["Sachin Dev", "Deepti Rawat", "Harish Taneja", "Abhishek Arya", "Sreyas Chakravarthi", "Anuj Solanki", "Shubhang Yadav", "Vikas Sehgal"]
         },
         {
@@ -3632,7 +3665,7 @@ function updateDashboardWithTechPeopleData() {
             title: "VP of Technology",
             department: "quality", 
             reports: 75,
-            email: "claudio.taglienti@company.com",
+            email: "claudio.taglienti@aeris.net",
             directReports: ["Gaurav Jain", "Nikhil Sule", "George Rusu", "Manoj Sharma", "Nikhil Agrawal", "Karan Gupta", "Vinay Kumar", "Sandeep Singh"]
         },
         {
@@ -3640,7 +3673,7 @@ function updateDashboardWithTechPeopleData() {
             title: "Director of Technology",
             department: "quality",
             reports: 44,
-            email: "subu.balakrishnan@company.com",
+            email: "subu.balakrishnan@aeris.net",
             directReports: ["Siddharth Asthana", "Nishith Murab", "Tazeem Ahmed", "Rajiv Bharti", "Mukesh Kumar", "Ankit Sharma", "Rohit Gupta", "Priya Singh"]
         },
         {
@@ -3648,7 +3681,7 @@ function updateDashboardWithTechPeopleData() {
             title: "Senior Technology Manager", 
             department: "quality",
             reports: 26,
-            email: "asit.goel@company.com",
+            email: "asit.goel@aeris.net",
             directReports: ["Karan Kapoor", "Vinkal Kumar", "Rajesh Yadav", "Amit Singh", "Neha Agarwal"]
         },
         {
@@ -3656,7 +3689,7 @@ function updateDashboardWithTechPeopleData() {
             title: "Senior Technology Manager",
             department: "architecture",
             reports: 13,
-            email: "drew.johnson@company.com",
+            email: "drew.johnson@aeris.net",
             directReports: ["Michael Chen", "Sarah Wilson", "David Kumar", "Lisa Thompson"]
         },
         {
@@ -3664,7 +3697,7 @@ function updateDashboardWithTechPeopleData() {
             title: "Senior Technology Manager",
             department: "engineering",
             reports: 9,
-            email: "ronnie.pettersson@company.com",
+            email: "ronnie.pettersson@aeris.net",
             directReports: ["Erik Johansson", "Anna Lindberg", "Magnus Olsson"]
         },
         {
@@ -3672,7 +3705,7 @@ function updateDashboardWithTechPeopleData() {
             title: "Senior Technology Manager",
             department: "architecture",
             reports: 7,
-            email: "narendra.sharma@company.com",
+            email: "narendra.sharma@aeris.net",
             directReports: ["Arun Kumar", "Vijay Singh"]
         },
         {
@@ -3680,7 +3713,7 @@ function updateDashboardWithTechPeopleData() {
             title: "Senior Technology Manager",
             department: "engineering",
             reports: 6,
-            email: "fredrik.janson@company.com",
+            email: "fredrik.janson@aeris.net",
             directReports: ["Johan Andersson", "Emma Carlsson", "Lars Nielsen"]
         },
         {
@@ -3688,7 +3721,7 @@ function updateDashboardWithTechPeopleData() {
             title: "Senior Technology Manager",
             department: "engineering",
             reports: 4,
-            email: "mircea.costache@company.com",
+            email: "mircea.costache@aeris.net",
             directReports: ["Adrian Popescu"]
         }
     ];
