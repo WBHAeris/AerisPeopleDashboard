@@ -1458,18 +1458,28 @@ function updateDashboardFromAllPeople() {
                 return status.includes('leave') || status.includes('vacation') || status.includes('absent');
             }).length;
             
-            // Calculate new hires this month using Column I 'onboard date' from active employees
-            let newHiresThisMonth = 0;
+            // Calculate new hires this month (definition: any record whose onboard date is in current month/year, regardless of current active status)
+            let newHiresThisMonth = 0;            // total-based
+            let newHiresActiveSubset = 0;         // for diagnostics only
             const currentMonth = new Date().getMonth();
             const currentYear = new Date().getFullYear();
             
             if(headerMap.onboardHeader){
-                activeEmployeesData.forEach(emp => {
+                // Count across all employees (authoritative metric)
+                employeeData.forEach(emp => {
                     const on = parseFlexibleDate(emp[headerMap.onboardHeader]);
                     if(on.date && on.date.getMonth() === currentMonth && on.date.getFullYear() === currentYear){
                         newHiresThisMonth++;
                     }
                 });
+                // Diagnostic: how many of those are currently active
+                activeEmployeesData.forEach(emp => {
+                    const on = parseFlexibleDate(emp[headerMap.onboardHeader]);
+                    if(on.date && on.date.getMonth() === currentMonth && on.date.getFullYear() === currentYear){
+                        newHiresActiveSubset++;
+                    }
+                });
+                console.log(`🧪 New Hires This Month totals: total-based=${newHiresThisMonth}, active-subset=${newHiresActiveSubset}`);
             }
             
             // Calculate new additions year to date using Column I 'onboard date'
